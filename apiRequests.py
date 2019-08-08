@@ -41,11 +41,16 @@ def download_images(urls, path_, download_amount):
         segment = (len(url.split('/')) - 1)
         img_name = path + url.split('/')[segment].split('?')[0]
         if (count < download_amount):
+            print(count)
+            global current_porcentage
+            current_porcentage = (count*100)/(download_amount)
+            print(current_porcentage)
             img = requests.get(url).content
             if not os.path.exists(img_name):
                 with open(img_name, 'wb') as image:
                     image.write(img)
             print(img_name, ' has been downloaded sucessfully!')
+    
     print('All downloads completed!')
 
 ###############################################

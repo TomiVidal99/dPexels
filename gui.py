@@ -7,18 +7,20 @@
 ############### Imports ###############
 
 from appJar import gui
-from apiRequests import execute_search
-from apiRequests import search_urls
-from apiRequests import download_images
 import constant
 from tempfile import TemporaryFile
 import os
+from apiRequests import execute_search
+from apiRequests import search_urls
+from apiRequests import download_images
 
 ############### FX ###############
 
+current_porcentage = 0
+
 def set_():
 	# function that executes the searching, gets variables from inputs
-	execute_search(app.getEntry('User key:'), app.getEntry('Searching word:'), constant.search_pages, app.getOptionBox('img_format'))
+	app.thread(execute_search, app.getEntry('User key:'), app.getEntry('Searching word:'), constant.search_pages, app.getOptionBox('img_format'))
 	max_photos = len(search_urls)
 	app.setScaleRange("Number of photos: ", minimum_photos, max_photos, curr=max_photos)
 	write_cached_data()
@@ -26,7 +28,7 @@ def set_():
 def download():
 	# function that downloads desired amount of images from the requested array of urls
 	num_of_photos = app.getScale("Number of photos: ")
-	download_images(search_urls, app.getEntry('Path'), num_of_photos)
+	app.thread(download_images, search_urls, app.getEntry('Path'), num_of_photos)
 
 def quit_app():
 	# function that executes when the exit button is pressed
@@ -64,7 +66,19 @@ def read_cached_data():
 		file = open('temp.txt', 'w')
 		file.write('key\n')
 		file.write('path\n')
-	
+
+def porcentage(current_porcentaje):
+	# This function is executed every time a image is downloaded and it updates to match the download progress
+	print('function executed')
+	app.setStatusbar('Downloading...', current_porcentaje)
+	if (current_porcentaje <= 50):
+		app.setStatusbarBg('red')
+	elif (current_porcentaje <= 70):
+		app.setStatusbarBg('yellow')
+	elif (current_porcentaje == 100):
+		app.setStatusbarBg('green')
+		app.setStatusbar('Success!', current_porcentaje)
+		
 
 
 ############### Define GUI components ##################
@@ -85,9 +99,10 @@ app.addOptionBox('img_format', ['original', 'large', 'medium', 'small', 'portrai
 app.addLabel('Image format: ', 'Image format: ', 6, 0, colspan=1)
 app.addLabelEntry('Path', 7, 0,colspan=3)
 app.addLabelScale("Number of photos: ", 8, 0,colspan=3)
-app.addButton('Set', set_, 9, 0, colspan=1)
-app.addButton('Download',download, 9, 1, colspan=1)
-app.addButton('Exit',quit_app, 9, 2, colspan=1)
+app.addButton('Set', set_, 9, 0, colspan=0)
+app.addButton('Download',download, 9, 1, colspan=0)
+app.addButton('Exit',quit_app, 9, 2, colspan=0)
+app.setStatusbar('Download progress', 0)
 
 
 ############### Config ################################
@@ -106,15 +121,24 @@ app.setEntryTooltip('User key:', 'You need to make an account on the pexels webs
 app.setEntryTooltip('Searching word:', 'A descriptive key word for the images that you are looking for')
 app.setLabelTooltip('Number of photos: ', 'Select the amount of photos that you want to download')
 
+app.setStatusbar('Download progress', 0)
+app.setStatusbarWidth(100, 0)
 
-################ read if exists previous defined variables
+
+############### Sets in its own thread the function download_images so the app wont frezee when downloading ################
+
+app.thread(porcentage, current_porcentage)
+
+################ read if exists previous defined variables ##########################
 
 read_cached_data()
 
-
 ############## Run app #################################
 
+
 app.go()
+
+
 
 
 
