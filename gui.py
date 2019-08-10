@@ -10,32 +10,45 @@ from appJar import gui
 import constant
 from tempfile import TemporaryFile
 import os
-from apiRequests import execute_search
 from apiRequests import search_urls
 from apiRequests import download_images
+from apiRequests import execute_search
+
 
 ############### FX ###############
 
-current_porcentage = 0
-
 def set_():
 	# function that executes the searching, gets variables from inputs
-	app.thread(execute_search, app.getEntry('User key:'), app.getEntry('Searching word:'), constant.search_pages, app.getOptionBox('img_format'))
+	app.threadCallback(execute_search, set_finished, app.getEntry('User key:'), app.getEntry('Searching word:'), constant.search_pages, app.getOptionBox('img_format'), fetch_progress)
+	
+
+def set_finished(response):
+	# Callback function executed when set has been executed
 	max_photos = len(search_urls)
 	app.setScaleRange("Number of photos: ", minimum_photos, max_photos, curr=max_photos)
 	write_cached_data()
 
 def download():
 	# function that downloads desired amount of images from the requested array of urls
-	num_of_photos = app.getScale("Number of photos: ")
-	app.thread(download_images, search_urls, app.getEntry('Path'), num_of_photos)
+	global can_download
+	can_download = True
+	
+	if (len(search_urls) > 0):
+		num_of_photos = app.getScale("Number of photos: ")
+		app.threadCallback(download_images, download_finished, search_urls, app.getEntry('Path'), num_of_photos, download_progress)
+	else:
+		print('None urls available, modify search parameters')
+
+def download_finished(response):
+	# Callback function executed when download has been completed
+	print('download has been completed!!! ', response)
 
 def quit_app():
 	# function that executes when the exit button is pressed
 	app.stop()
 
 def write_cached_data():
-	# function to write temporal data from current usage of the app
+	# function to write temporal data from current instance of the app
 	data = open('temp.txt', 'w') 
 	if (app.getEntry('User key:') != ''):
 		data.writelines(app.getEntry('User key:') + '\n')
@@ -67,19 +80,48 @@ def read_cached_data():
 		file.write('key\n')
 		file.write('path\n')
 
-def porcentage(current_porcentaje):
-	# This function is executed every time a image is downloaded and it updates to match the download progress
-	print('function executed')
-	app.setStatusbar('Downloading...', current_porcentaje)
-	if (current_porcentaje <= 50):
-		app.setStatusbarBg('red')
-	elif (current_porcentaje <= 70):
-		app.setStatusbarBg('yellow')
-	elif (current_porcentaje == 100):
-		app.setStatusbarBg('green')
-		app.setStatusbar('Success!', current_porcentaje)
-		
 
+def download_progress(current_porcentaje, current, total):
+	# This function is executed every time a image is downloaded and it updates to match the download progress
+	def fn(c, n, t):
+		app.queueFunction(app.setStatusbar, 'Downloading...   ' + str(c) + '%         ' + str(n) + ' de ' + str(t), 0)
+		if (current_porcentaje <= 50):
+			app.queueFunction(app.setStatusbarBg, 'red')
+		elif (current_porcentaje <= 70):
+			app.queueFunction(app.setStatusbarBg, 'yellow')
+		elif (current_porcentaje == 100):
+			app.queueFunction(app.setStatusbarBg, 'green')
+			app.queueFunction(app.setStatusbar, 'Success! ' + str(c) + '%         ' + str(n) + ' de ' + str(t), 0)
+	app.thread(fn, current_porcentaje, current, total)
+
+
+def fetch_progress(current_porcentaje):
+	# This function is executed when requesting the images and so it displays the current progress on the progress bar
+	def fn(c):
+		print(c)
+		if (c == 'finished'):
+			app.queueFunction(app.setStatusbar, 'Data feched')
+			app.queueFunction(app.setStatusbarBg, 'green')
+		else:
+			app.queueFunction(app.setStatusbar, 'Fetching data...')
+			app.queueFunction(app.setStatusbarBg, 'grey')	
+
+	app.thread(fn, current_porcentaje)
+
+
+def stop_download():
+	# Function that executes when stop download button is pressed; and it will do so
+	# TODO yet
+	print('stopping...')
+
+
+def KeyPress(key):
+	if (key == 	'<Up>'):
+		set_()
+	elif (key == '<Return>'):
+		download()
+	else:
+		print('Not binding for that key')
 
 ############### Define GUI components ##################
 
@@ -89,20 +131,32 @@ app.setPadding([10, 0])
 app.setInPadding([0, 0])
 
 app.setStretch('sides')
-app.addLabel('title', 'Download all the images from PEXELS! :)', 0, 0, colspan=3).config(font="Roman 20")
-app.addHorizontalSeparator(1, 0, 3, colour="red")
-app.addLabelEntry('User key:', 2, 0, colspan=3)
+app.addLabel('title', 'Download all the images from PEXELS! :)', 0, 0, colspan=4).config(font="Roman 20")
+
+app.addHorizontalSeparator(1, 0, colspan=4, colour="red")
+
+app.addLabelEntry('User key:', 2, 0, colspan=4)
+
 app.addLabel('description', 'You can find your key in this link:', 3, 0, colspan=1).config(font="Helvetica 11")
-app.addWebLink('https://www.pexels.com/api/new/', 'https://www.pexels.com/api/new/', 3, 1, colspan=2)
-app.addLabelEntry('Searching word:', 5, 0, colspan=3)
-app.addOptionBox('img_format', ['original', 'large', 'medium', 'small', 'portrait', 'landscape', 'tiny'], 6, 1, colspan=2)
+
+app.addWebLink('https://www.pexels.com/api/new/', 'https://www.pexels.com/api/new/', 3, 1, colspan=3)
+
+app.addLabelEntry('Searching word:', 5, 0, colspan=4)
+
+app.addOptionBox('img_format', ['original', 'large', 'medium', 'small', 'portrait', 'landscape', 'tiny'], 6, 1, colspan=3)
+
 app.addLabel('Image format: ', 'Image format: ', 6, 0, colspan=1)
-app.addLabelEntry('Path', 7, 0,colspan=3)
-app.addLabelScale("Number of photos: ", 8, 0,colspan=3)
-app.addButton('Set', set_, 9, 0, colspan=0)
-app.addButton('Download',download, 9, 1, colspan=0)
-app.addButton('Exit',quit_app, 9, 2, colspan=0)
-app.setStatusbar('Download progress', 0)
+
+app.addLabelEntry('Path', 7, 0,colspan=4)
+
+app.addLabelScale("Number of photos: ", 8, 0,colspan=4)
+
+app.addButton('Set', set_, 9, 0, colspan=1)
+app.addButton('Download', download, 9, 1, colspan=1)
+app.addButton('Stop download', stop_download, 9, 2, colspan=1)
+app.addButton('Exit', quit_app, 9, 3, colspan=1)
+
+app.addStatusbar(fields=1)
 
 
 ############### Config ################################
@@ -124,17 +178,18 @@ app.setLabelTooltip('Number of photos: ', 'Select the amount of photos that you 
 app.setStatusbar('Download progress', 0)
 app.setStatusbarWidth(100, 0)
 
+#####################################################################################
 
-############### Sets in its own thread the function download_images so the app wont frezee when downloading ################
+# set hotkeys
 
-app.thread(porcentage, current_porcentage)
+app.bindKey('<Up>', KeyPress)
+app.bindKey('<Return>', KeyPress)
 
 ################ read if exists previous defined variables ##########################
 
 read_cached_data()
 
 ############## Run app #################################
-
 
 app.go()
 
