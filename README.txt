@@ -3,3 +3,5 @@ The objetive of this app is to create an intuitive GUI for downloading a lot of 
 TODO: 
   Make it a bit prettier :)
 You can get your API key from https://www.pexels.com/api/new/
+
+# If you are on linux make sure you've installed python3-tk, and using of course python3
